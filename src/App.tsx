@@ -90,13 +90,17 @@ export default function App() {
   const [activeVideo, setActiveVideo] = useState<VideoItem | null>(null);
   const [copied, setCopied] = useState(false);
   const [localNote, setLocalNote] = useState("");
+  const [showNoteEditor, setShowNoteEditor] = useState(false);
 
   useEffect(() => {
     setCopied(false);
     if (activeVideo) {
-      setLocalNote(videoNotes[activeVideo.id] || "");
+      const existingNote = videoNotes[activeVideo.id] || "";
+      setLocalNote(existingNote);
+      setShowNoteEditor(!!existingNote);
     } else {
       setLocalNote("");
+      setShowNoteEditor(false);
     }
   }, [activeVideo]);
 
@@ -879,7 +883,23 @@ export default function App() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Personal Note Toggle Button */}
+                    <button
+                      onClick={() => setShowNoteEditor((prev) => !prev)}
+                      className={`px-4 py-2 text-xs font-medium rounded-xl border flex items-center gap-1.5 transition-all duration-300 cursor-pointer ${
+                        showNoteEditor
+                          ? "bg-amber-500/10 border-amber-500/40 text-amber-300 shadow-md shadow-amber-500/2"
+                          : localNote
+                          ? "bg-amber-500/5 border-amber-500/20 text-amber-400 hover:text-amber-300"
+                          : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                      title="지혜 노트 작성 및 편집하기"
+                    >
+                      <FileText className={`w-3.5 h-3.5 ${localNote ? "text-amber-400" : ""}`} />
+                      <span>{localNote ? "지혜 노트 보기" : "노트 작성"}</span>
+                    </button>
+
                     {/* Toggle Bookmark inside Modal */}
                     <button
                       onClick={() => handleToggleBookmark(activeVideo.id)}
@@ -973,33 +993,35 @@ export default function App() {
                 )}
 
                 {/* Personal Notes Section */}
-                <div className="pt-5 border-t border-slate-900/80">
-                  <h3 className="text-xs font-semibold tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5 font-display uppercase">
-                    <FileText className="w-3.5 h-3.5 text-amber-400" />
-                    나의 지혜 노트 (개인 메모)
-                  </h3>
-                  <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
-                    <textarea
-                      placeholder="이 영상에서 얻은 지혜와 깨달음을 자유롭게 적어보세요. 입력한 내용은 기기에 자동으로 저장됩니다."
-                      value={localNote}
-                      onChange={(e) => handleChangeNote(e.target.value)}
-                      className="w-full h-24 bg-slate-950 border border-slate-850 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-all resize-none leading-relaxed"
-                    />
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500 font-mono">
-                        {localNote.length}자 작성됨
-                      </span>
-                      {localNote && (
-                        <button
-                          onClick={() => handleChangeNote("")}
-                          className="text-rose-400 hover:text-rose-300 font-medium transition-all cursor-pointer"
-                        >
-                          메모 삭제
-                        </button>
-                      )}
+                {showNoteEditor && (
+                  <div className="pt-5 border-t border-slate-900/80 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <h3 className="text-xs font-semibold tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5 font-display uppercase">
+                      <FileText className="w-3.5 h-3.5 text-amber-400" />
+                      나의 지혜 노트 (개인 메모)
+                    </h3>
+                    <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
+                      <textarea
+                        placeholder="이 영상에서 얻은 지혜와 깨달음을 자유롭게 적어보세요. 입력한 내용은 기기에 자동으로 저장됩니다."
+                        value={localNote}
+                        onChange={(e) => handleChangeNote(e.target.value)}
+                        className="w-full h-24 bg-slate-950 border border-slate-850 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-all resize-none leading-relaxed"
+                      />
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500 font-mono">
+                          {localNote.length}자 작성됨
+                        </span>
+                        {localNote && (
+                          <button
+                            onClick={() => handleChangeNote("")}
+                            className="text-rose-400 hover:text-rose-300 font-medium transition-all cursor-pointer"
+                          >
+                            메모 삭제
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Similar Wisdom Recommendations Section */}
                 {similarVideos.length > 0 && (

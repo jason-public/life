@@ -111,7 +111,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {/* Note indicator */}
         {hasNote && (
           <div
-            className="absolute top-3 right-13 p-2 rounded-xl border border-amber-500/30 bg-amber-500/15 backdrop-blur-md text-amber-400 shadow-sm z-10 cursor-help"
+            className="absolute top-3 right-[48px] p-2 rounded-xl border border-amber-500/30 bg-amber-500/15 backdrop-blur-md text-amber-400 shadow-sm z-10 cursor-help"
             title="작성된 메모가 있습니다"
           >
             <FileText className="w-3.5 h-3.5" />
