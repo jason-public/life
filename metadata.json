@@ -1,0 +1,6 @@
+{
+  "name": "YouTube Wisdom Board",
+  "description": "차분한 슬레이트 블루 및 인디고 테마와 토스 스타일 벤토 그리드로 구현한 유튜브 인생 조언 및 대화법 동영상 큐레이션 웹사이트입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
