@@ -91,9 +91,11 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [localNote, setLocalNote] = useState("");
   const [showNoteEditor, setShowNoteEditor] = useState(false);
+  const [showSimilarVideos, setShowSimilarVideos] = useState(false);
 
   useEffect(() => {
     setCopied(false);
+    setShowSimilarVideos(false);
     if (activeVideo) {
       const existingNote = videoNotes[activeVideo.id] || "";
       setLocalNote(existingNote);
@@ -1026,39 +1028,54 @@ export default function App() {
                 {/* Similar Wisdom Recommendations Section */}
                 {similarVideos.length > 0 && (
                   <div className="pt-5 border-t border-slate-900/80">
-                    <h3 className="text-xs font-semibold tracking-wider text-slate-400 mb-3 flex items-center gap-1.5 font-display uppercase">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      비슷한 지혜 추천
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {similarVideos.map((video) => (
-                        <button
-                          key={`similar-${video.id}`}
-                          onClick={() => handleSelectVideo(video)}
-                          className="flex flex-col text-left bg-slate-900/30 hover:bg-slate-900/80 border border-slate-850 hover:border-indigo-500/30 rounded-xl overflow-hidden transition-all duration-300 group cursor-pointer"
-                        >
-                          <div className="relative aspect-video w-full bg-slate-950 overflow-hidden border-b border-slate-900/50">
-                            <img
-                              src={video.thumbnail}
-                              alt={video.title}
-                              className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 rounded text-[9px] font-mono text-slate-400">
-                              {video.channel}
+                    <button
+                      onClick={() => setShowSimilarVideos((prev) => !prev)}
+                      className={`w-full py-3.5 px-4 rounded-2xl border flex items-center justify-between text-xs font-semibold transition-all duration-300 cursor-pointer ${
+                        showSimilarVideos
+                          ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300 shadow-md shadow-indigo-500/2"
+                          : "bg-slate-900/30 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Sparkles className={`w-4 h-4 ${showSimilarVideos ? "text-indigo-400 fill-indigo-400/20" : "text-slate-400"}`} />
+                        <span>비슷한 지혜 추천 영상 보기</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500 flex items-center gap-1 bg-slate-950/60 px-2 py-0.5 rounded-md border border-slate-850">
+                        {showSimilarVideos ? "닫기 ▲" : `${similarVideos.length}개 추천 ▼`}
+                      </span>
+                    </button>
+
+                    {showSimilarVideos && (
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {similarVideos.map((video) => (
+                          <button
+                            key={`similar-${video.id}`}
+                            onClick={() => handleSelectVideo(video)}
+                            className="flex flex-col text-left bg-slate-900/30 hover:bg-slate-900/80 border border-slate-850 hover:border-indigo-500/30 rounded-xl overflow-hidden transition-all duration-300 group cursor-pointer"
+                          >
+                            <div className="relative aspect-video w-full bg-slate-950 overflow-hidden border-b border-slate-900/50">
+                              <img
+                                src={video.thumbnail}
+                                alt={video.title}
+                                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-slate-950/80 backdrop-blur-sm border border-slate-800/50 rounded text-[9px] font-mono text-slate-400">
+                                {video.channel}
+                              </div>
                             </div>
-                          </div>
-                          <div className="p-2.5 min-w-0 flex-1 flex flex-col justify-between gap-1.5">
-                            <h4 className="text-[11px] font-medium text-slate-300 group-hover:text-indigo-300 transition-colors line-clamp-2 leading-snug">
-                              {video.title}
-                            </h4>
-                            <span className="text-[9px] text-slate-500 font-mono">
-                              조회수 {video.views >= 10000 ? `${(video.views / 10000).toFixed(0)}만회` : `${video.views.toLocaleString()}회`}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                            <div className="p-2.5 min-w-0 flex-1 flex flex-col justify-between gap-1.5">
+                              <h4 className="text-[11px] font-medium text-slate-300 group-hover:text-indigo-300 transition-colors line-clamp-2 leading-snug">
+                                {video.title}
+                              </h4>
+                              <span className="text-[9px] text-slate-500 font-mono">
+                                조회수 {video.views >= 10000 ? `${(video.views / 10000).toFixed(0)}만회` : `${video.views.toLocaleString()}회`}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
