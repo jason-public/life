@@ -4,7 +4,7 @@ import { StatsDashboard } from "./components/StatsDashboard";
 import { VideoCard } from "./components/VideoCard";
 import { INITIAL_VIDEOS, VideoItem } from "./data/videos";
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, Search, FilterX, HelpCircle, Compass, Sparkles, Hash, Tag, X, Play, Calendar, Eye, ExternalLink, Heart, Share2, Check, FileText, Folder } from "lucide-react";
+import { Menu, Search, FilterX, HelpCircle, Compass, Sparkles, Hash, Tag, X, Play, Calendar, Eye, ExternalLink, Heart, Share2, Check, FileText, Folder, ArrowUp, Sun, Moon } from "lucide-react";
 
 const POPULAR_KEYWORDS = [
   "니체", "자존감", "인간관계", "대화법", "성공습관", "처세술", "멘탈관리", "동기부여", "지혜", "위로"
@@ -20,6 +20,26 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date-desc");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Theme state initialized from localStorage with dark default
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem("wisdom_board_theme");
+      return (saved === "light" || saved === "dark") ? saved : "dark";
+    } catch (e) {
+      console.error("Failed to load theme preference", e);
+      return "dark";
+    }
+  });
+
+  // Persist theme to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem("wisdom_board_theme", theme);
+    } catch (e) {
+      console.error("Failed to save theme preference", e);
+    }
+  }, [theme]);
 
   // Bookmark (찜하기) state initialized from localStorage
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
@@ -92,10 +112,84 @@ export default function App() {
   const [localNote, setLocalNote] = useState("");
   const [showNoteEditor, setShowNoteEditor] = useState(false);
   const [showSimilarVideos, setShowSimilarVideos] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [focusedVideoId, setFocusedVideoId] = useState<string | null>(null);
+  const [suggestedVideoToast, setSuggestedVideoToast] = useState<VideoItem | null>(null);
+
+  // Custom User Tags state
+  const [customTags, setCustomTags] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("wisdom_board_custom_tags");
+      return saved ? JSON.parse(saved) : ["인생영상", "다시보기", "동기부여"];
+    } catch (e) {
+      console.error("Failed to load custom tags", e);
+      return ["인생영상", "다시보기", "동기부여"];
+    }
+  });
+
+  // Video-to-Custom-Tags mapping state
+  const [videoCustomTagsMap, setVideoCustomTagsMap] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem("wisdom_board_video_custom_tags");
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Failed to load video custom tags map", e);
+      return {};
+    }
+  });
+
+  // Selected custom tag filter state
+  const [selectedCustomTag, setSelectedCustomTag] = useState<string | null>(null);
+
+  // Sync custom tags to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("wisdom_board_custom_tags", JSON.stringify(customTags));
+    } catch (e) {
+      console.error("Failed to save custom tags", e);
+    }
+  }, [customTags]);
+
+  // Sync video custom tags mapping to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("wisdom_board_video_custom_tags", JSON.stringify(videoCustomTagsMap));
+    } catch (e) {
+      console.error("Failed to save video custom tags mapping", e);
+    }
+  }, [videoCustomTagsMap]);
+
+  useEffect(() => {
+    // 1.5초 뒤에 가볍게 제안 토스트 노출 (사용자의 자연스러운 눈길을 끌기 위해)
+    const timer = setTimeout(() => {
+      const unwatchedVideos = INITIAL_VIDEOS.filter((video) => !recentVideoIds.includes(video.id));
+      const candidates = unwatchedVideos.length > 0 ? unwatchedVideos : INITIAL_VIDEOS;
+      
+      if (candidates.length > 0) {
+        const randomIndex = Math.floor(Math.random() * candidates.length);
+        setSuggestedVideoToast(candidates[randomIndex]);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     setCopied(false);
     setShowSimilarVideos(false);
+    setFocusedVideoId(null);
     if (activeVideo) {
       const existingNote = videoNotes[activeVideo.id] || "";
       setLocalNote(existingNote);
@@ -334,6 +428,10 @@ export default function App() {
     }
   };
 
+  const handleToggleFocus = (id: string) => {
+    setFocusedVideoId((prev) => (prev === id ? null : id));
+  };
+
   const handleAssignVideoToFolder = (videoId: string, folderId: string | null) => {
     setVideoFolderMap((prev) => {
       const updated = { ...prev };
@@ -354,6 +452,89 @@ export default function App() {
   const handleSelectFolder = (folderId: string | null) => {
     setSelectedFolderId(folderId);
     setShowOnlyBookmarks(true);
+  };
+
+  // Custom Tags CRUD Operations
+  const handleAddCustomTag = (tag: string) => {
+    if (tag.trim() && !customTags.includes(tag.trim())) {
+      setCustomTags((prev) => [...prev, tag.trim()]);
+    }
+  };
+
+  const handleRenameCustomTag = (oldTag: string, newTag: string) => {
+    const trimmedNew = newTag.trim();
+    if (!trimmedNew || oldTag === trimmedNew) return;
+    
+    setCustomTags((prev) => prev.map((t) => (t === oldTag ? trimmedNew : t)));
+    
+    setVideoCustomTagsMap((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((vidId) => {
+        if (updated[vidId]) {
+          updated[vidId] = updated[vidId].map((t) => (t === oldTag ? trimmedNew : t));
+        }
+      });
+      return updated;
+    });
+
+    if (selectedCustomTag === oldTag) {
+      setSelectedCustomTag(trimmedNew);
+    }
+  };
+
+  const handleDeleteCustomTag = (tag: string) => {
+    setCustomTags((prev) => prev.filter((t) => t !== tag));
+    
+    setVideoCustomTagsMap((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((vidId) => {
+        if (updated[vidId]) {
+          updated[vidId] = updated[vidId].filter((t) => t !== tag);
+        }
+      });
+      return updated;
+    });
+
+    if (selectedCustomTag === tag) {
+      setSelectedCustomTag(null);
+    }
+  };
+
+  const handleToggleVideoCustomTag = (videoId: string, tag: string) => {
+    setVideoCustomTagsMap((prev) => {
+      const updated = { ...prev };
+      const currentTags = updated[videoId] || [];
+      if (currentTags.includes(tag)) {
+        updated[videoId] = currentTags.filter((t) => t !== tag);
+      } else {
+        updated[videoId] = [...currentTags, tag];
+      }
+      return updated;
+    });
+  };
+
+  // Recommend a random unwatched video
+  const handleRecommendRandomVideo = () => {
+    const unwatchedVideos = videos.filter((video) => !recentVideoIds.includes(video.id));
+    const candidates = unwatchedVideos.length > 0 ? unwatchedVideos : videos;
+    
+    if (candidates.length === 0) return;
+    
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    const randomVideo = candidates[randomIndex];
+    handleSelectVideo(randomVideo);
+  };
+
+  // Shuffle the video list randomly
+  const handleShuffleVideos = () => {
+    setVideos((prev) => {
+      const shuffled = [...prev];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    });
   };
 
   // Toggle category on/off (Supports multi-select)
@@ -397,6 +578,14 @@ export default function App() {
 
   // Filter videos based on selection and search query
   const filteredVideos = videos.filter((video) => {
+    // Custom Tag Filter Match
+    if (selectedCustomTag) {
+      const assigned = videoCustomTagsMap[video.id] || [];
+      if (!assigned.includes(selectedCustomTag)) {
+        return false;
+      }
+    }
+
     // If show only bookmarks is toggled, check if video is bookmarked
     if (showOnlyBookmarks) {
       if (!bookmarkedIds.includes(video.id)) {
@@ -453,7 +642,7 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans overflow-x-hidden">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 flex font-sans overflow-x-hidden ${theme}`}>
       {/* Sidebar Component (Handles filters & sorting) */}
       <Sidebar
         selectedCategories={selectedCategories}
@@ -476,6 +665,14 @@ export default function App() {
         onDeleteFolder={handleDeleteFolder}
         videoFolderMap={videoFolderMap}
         bookmarkedIds={bookmarkedIds}
+        customTags={customTags}
+        videoCustomTagsMap={videoCustomTagsMap}
+        selectedCustomTag={selectedCustomTag}
+        onSelectCustomTag={setSelectedCustomTag}
+        onAddCustomTag={handleAddCustomTag}
+        onRenameCustomTag={handleRenameCustomTag}
+        onDeleteCustomTag={handleDeleteCustomTag}
+        videos={videos}
       />
 
       {/* Main Content Area */}
@@ -496,6 +693,20 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+              className="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-800/80 rounded-xl hover:bg-slate-800 transition-all duration-300 cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              aria-label="Toggle theme"
+              title={theme === "light" ? "다크 모드로 전환" : "라이트 모드로 전환"}
+            >
+              {theme === "light" ? (
+                <Moon className="w-4.5 h-4.5 text-indigo-400 animate-pulse" />
+              ) : (
+                <Sun className="w-4.5 h-4.5 text-amber-400 animate-spin-slow" />
+              )}
+            </button>
+
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[11px] font-semibold text-emerald-400 font-mono tracking-wider">
               <Sparkles className="w-3 h-3 text-emerald-400 animate-spin" />
               DEEPMIND INTELLIGENCE ENGAGED
@@ -516,7 +727,7 @@ export default function App() {
           </div>
 
           {/* Bento Stats Summary dashboard overlay */}
-          <StatsDashboard videos={videos} />
+          <StatsDashboard videos={videos} onShuffle={handleShuffleVideos} />
 
           {/* Smart Search & Exploration Center */}
           <div className="bg-[#1e293b]/40 backdrop-blur-md border border-slate-800/80 rounded-3xl p-6 mb-8 shadow-md">
@@ -525,12 +736,22 @@ export default function App() {
               {/* Left Column: Input and search mode indicators */}
               <div className="flex-1 flex flex-col justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                    <Search className="w-4 h-4 text-indigo-400" />
-                    인텔리전트 통합 검색 센터
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Search className="w-4 h-4 text-indigo-400" />
+                      인텔리전트 통합 검색 센터
+                    </h3>
+                    <button
+                      onClick={handleRecommendRandomVideo}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 active:scale-[0.98] border border-indigo-500/30 text-indigo-300 hover:text-indigo-200 text-xs font-semibold rounded-xl transition-all duration-300 shadow-md shadow-indigo-500/5 cursor-pointer self-start sm:self-auto"
+                      title="시청하지 않은 영상 중 하나를 무작위로 추천해 드립니다"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                      <span>오늘의 무작위 지혜</span>
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                    일반 단어 검색 시 <strong className="text-emerald-400">핵심 키워드 검색</strong>이 자동 작동하며, 단어 앞에 <strong className="text-indigo-400">#</strong>을 붙이거나 우측 단어/해시태그를 탭하면 <strong className="text-indigo-400">해시태그 검색</strong>이 활성화됩니다.
+                    일반 단어 검색 시 <strong className="text-emerald-400">핵심 키워드 검색</strong>이 자동 작동하며, 단어 앞에 <strong className="text-indigo-400">#</strong>을 붙이거나 우측 단어/태그를 탭하면 관련 검색이 활성화됩니다.
                   </p>
                 </div>
 
@@ -702,12 +923,11 @@ export default function App() {
                 <div>
                   <h4 className="text-[11px] font-semibold text-indigo-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider font-mono">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                    추천 해시태그 검색
+                    추천 태그 검색
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
                     {POPULAR_HASHTAGS.map((tag) => {
-                      const hashStr = `#${tag}`;
-                      const isActive = searchQuery === hashStr;
+                      const isActive = searchQuery === tag;
                       return (
                         <button
                           key={tag}
@@ -715,16 +935,16 @@ export default function App() {
                             if (isActive) {
                               setSearchQuery("");
                             } else {
-                              setSearchQuery(hashStr);
+                              setSearchQuery(tag);
                             }
                           }}
-                          className={`text-[10px] px-2.5 py-1.5 rounded-xl transition-all duration-300 border font-mono cursor-pointer ${
+                          className={`text-[10px] px-2.5 py-1.5 rounded-xl transition-all duration-300 border font-sans cursor-pointer ${
                             isActive
                               ? "bg-indigo-500/15 border-indigo-500/50 text-indigo-300 font-semibold shadow-md shadow-indigo-500/5"
                               : "bg-slate-950/60 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-900"
                           }`}
                         >
-                          #{tag}
+                          {tag}
                         </button>
                       );
                     })}
@@ -737,27 +957,54 @@ export default function App() {
           </div>
 
           {/* Grid of Bento Cards */}
-          <AnimatePresence mode="popLayout">
-            {sortedVideos.length > 0 ? (
-              <motion.div
-                layout
-                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-              >
-                {sortedVideos.map((video) => (
-                  <VideoCard
-                    key={video.id}
-                    video={video}
-                    onUpdateVideo={handleUpdateVideo}
-                    onTagClick={(tag) => setSearchQuery(`#${tag}`)}
-                    isBookmarked={bookmarkedIds.includes(video.id)}
-                    onToggleBookmark={handleToggleBookmark}
-                    onPlayClick={handleSelectVideo}
-                    hasNote={!!videoNotes[video.id]}
-                  />
-                ))}
-              </motion.div>
-            ) : (
-              /* No Results state card */
+          <div className="relative">
+            <AnimatePresence>
+              {focusedVideoId !== null && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setFocusedVideoId(null)}
+                  className="fixed inset-0 bg-[#020617]/75 backdrop-blur-[4px] z-10 transition-all duration-300 cursor-pointer flex items-center justify-center"
+                >
+                  {/* Floating instructions when focus mode is active */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold text-xs rounded-full backdrop-blur-md shadow-lg pointer-events-none flex items-center gap-1.5"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                    <span>집중 모드 활성화 중 — 빈 곳을 클릭하여 해제</span>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence mode="popLayout">
+              {sortedVideos.length > 0 ? (
+                <motion.div
+                  layout
+                  className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                >
+                  {sortedVideos.map((video) => (
+                    <VideoCard
+                      key={video.id}
+                      video={video}
+                      onUpdateVideo={handleUpdateVideo}
+                      onTagClick={(tag) => setSearchQuery(`#${tag}`)}
+                      isBookmarked={bookmarkedIds.includes(video.id)}
+                      onToggleBookmark={handleToggleBookmark}
+                      onPlayClick={handleSelectVideo}
+                      hasNote={!!videoNotes[video.id]}
+                      isFocused={focusedVideoId === video.id}
+                      isAnyVideoFocused={focusedVideoId !== null}
+                      onToggleFocus={handleToggleFocus}
+                    />
+                  ))}
+                </motion.div>
+              ) : (
+                /* No Results state card */
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -801,6 +1048,7 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
         </main>
       </div>
 
@@ -823,10 +1071,10 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ type: "spring", duration: 0.5, bounce: 0.15 }}
-              className="relative w-full max-w-3xl bg-[#0f172a]/95 border border-slate-800/90 rounded-[28px] overflow-hidden shadow-2xl flex flex-col z-10"
+              className="relative w-full max-w-3xl max-h-[85vh] md:max-h-[90vh] bg-[#0f172a]/95 border border-slate-800/90 rounded-[28px] overflow-hidden shadow-2xl flex flex-col z-10"
             >
               {/* Top bar with Channel & Close */}
-              <div className="px-6 py-4 border-b border-slate-900 flex items-center justify-between bg-slate-950/40">
+              <div className="px-6 py-4 border-b border-slate-900 flex items-center justify-between bg-slate-950/40 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 rounded-lg">
                     {activeVideo.channel}
@@ -840,19 +1088,21 @@ export default function App() {
                 </button>
               </div>
 
-              {/* YouTube Iframe Section */}
-              <div className="relative aspect-video w-full bg-slate-950">
-                <iframe
-                  src={`https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&modestbranding=1&rel=0`}
-                  title={activeVideo.title}
-                  className="absolute inset-0 w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
+              {/* Scrollable Content Container */}
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
+                {/* YouTube Iframe Section */}
+                <div className="relative aspect-video w-full bg-slate-950 flex-shrink-0">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&modestbranding=1&rel=0`}
+                    title={activeVideo.title}
+                    className="absolute inset-0 w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
 
-              {/* Detail Content Section */}
-              <div className="p-6 flex flex-col gap-4">
+                {/* Detail Content Section */}
+                <div className="p-6 flex flex-col gap-4">
                 <div>
                   <h2 className="text-base font-semibold text-white leading-snug tracking-tight mb-2">
                     {activeVideo.title}
@@ -994,6 +1244,47 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Custom Tags Section */}
+                <div className="pt-5 border-t border-slate-900/80 animate-in fade-in duration-300">
+                  <h3 className="text-xs font-semibold tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5 font-display uppercase">
+                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                    나의 태그 지정
+                  </h3>
+                  <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      이 영상에 나만의 태그를 지정하여 정돈해두세요. (사이드바 하단에서 새 태그를 생성/수정/삭제할 수 있습니다)
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {customTags.map((tag) => {
+                        const assignedTags = videoCustomTagsMap[activeVideo.id] || [];
+                        const isAssigned = assignedTags.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            onClick={() => handleToggleVideoCustomTag(activeVideo.id, tag)}
+                            className={`px-3 py-1.5 text-xs rounded-xl border transition-all duration-300 cursor-pointer flex items-center gap-1.5 ${
+                              isAssigned
+                                ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300 font-semibold shadow-md shadow-indigo-500/2"
+                                : "bg-slate-900 border-slate-850 text-slate-500 hover:text-slate-300 hover:border-slate-800"
+                            }`}
+                          >
+                            <span className="text-indigo-400">#</span>
+                            <span>{tag}</span>
+                            {isAssigned && (
+                              <Check className="w-3 h-3 text-indigo-400 stroke-[3px]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                      {customTags.length === 0 && (
+                        <div className="text-[11px] text-slate-600 italic py-1">
+                          생성된 태그가 없습니다. 사이드바 하단의 '나의 태그 관리'에서 새 태그를 먼저 추가해주세요.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Personal Notes Section */}
                 {showNoteEditor && (
                   <div className="pt-5 border-t border-slate-900/80 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -1079,8 +1370,111 @@ export default function App() {
                   </div>
                 )}
               </div>
+              </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Scroll to Top Floating Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+            whileHover={{ scale: 1.1, y: -2 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="fixed bottom-6 right-6 p-3.5 bg-slate-900/90 border border-slate-800/80 hover:border-indigo-500/50 text-slate-300 hover:text-white rounded-2xl shadow-xl hover:shadow-indigo-500/10 backdrop-blur-md transition-all duration-300 flex items-center justify-center cursor-pointer z-40"
+            title="맨 위로 이동"
+          >
+            <ArrowUp className="w-5 h-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Welcome Suggestion Toast Notification */}
+      <AnimatePresence>
+        {suggestedVideoToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="fixed bottom-6 left-6 right-6 sm:left-auto sm:right-6 sm:w-[380px] bg-[#0f172a]/95 backdrop-blur-md border border-indigo-500/30 rounded-2xl shadow-2xl p-4 z-40 flex flex-col gap-3"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+              <div className="flex items-center gap-1.5 text-indigo-400 font-semibold text-xs tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                <span>오늘의 추천 지혜 큐레이션</span>
+              </div>
+              <button
+                onClick={() => setSuggestedVideoToast(null)}
+                className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div 
+              className="flex gap-3 cursor-pointer group/toast"
+              onClick={() => {
+                handleSelectVideo(suggestedVideoToast);
+                setSuggestedVideoToast(null);
+              }}
+            >
+              {/* Thumbnail Mini */}
+              <div className="relative w-24 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-slate-800 bg-slate-950">
+                <img 
+                  src={`https://img.youtube.com/vi/${suggestedVideoToast.youtubeId}/mqdefault.jpg`} 
+                  alt={suggestedVideoToast.title}
+                  className="w-full h-full object-cover group-hover/toast:scale-105 transition-transform duration-300"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/toast:opacity-100 transition-opacity">
+                  <Play className="w-4 h-4 text-white fill-white" />
+                </div>
+              </div>
+
+              {/* Title & Stats */}
+              <div className="flex flex-col justify-between min-w-0">
+                <h4 className="text-slate-200 text-xs font-semibold leading-snug line-clamp-2 group-hover/toast:text-indigo-300 transition-colors">
+                  {suggestedVideoToast.title}
+                </h4>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-indigo-400 font-medium px-1.5 py-0.5 bg-indigo-500/10 rounded-md">
+                    {suggestedVideoToast.categories[0]}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    조회수 {suggestedVideoToast.views >= 10000 ? `${(suggestedVideoToast.views / 10000).toFixed(0)}만회` : `${suggestedVideoToast.views.toLocaleString()}회`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-1">
+              <button
+                onClick={() => setSuggestedVideoToast(null)}
+                className="flex-1 py-1.5 px-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/40 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium rounded-xl transition-all"
+              >
+                나중에 보기
+              </button>
+              <button
+                onClick={() => {
+                  handleSelectVideo(suggestedVideoToast);
+                  setSuggestedVideoToast(null);
+                }}
+                className="flex-1 py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-600/15 hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-1"
+              >
+                <span>지금 시청하기</span>
+                <Play className="w-3 h-3 fill-current" />
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

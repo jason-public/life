@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, Compass, SlidersHorizontal, ListCollapse, RefreshCw, X, HelpCircle, Heart, Clock, Play, Trash2, Folder, Plus } from "lucide-react";
+import { Check, Compass, SlidersHorizontal, ListCollapse, RefreshCw, X, HelpCircle, Heart, Clock, Play, Trash2, Folder, Plus, Tag, Pencil } from "lucide-react";
 import { CATEGORIES, VideoItem } from "../data/videos";
 
 export interface BookmarkFolder {
@@ -28,6 +28,14 @@ interface SidebarProps {
   onDeleteFolder: (folderId: string) => void;
   videoFolderMap: Record<string, string>;
   bookmarkedIds: string[];
+  customTags: string[];
+  videoCustomTagsMap: Record<string, string[]>;
+  selectedCustomTag: string | null;
+  onSelectCustomTag: (tag: string | null) => void;
+  onAddCustomTag: (tag: string) => void;
+  onRenameCustomTag: (oldTag: string, newTag: string) => void;
+  onDeleteCustomTag: (tag: string) => void;
+  videos: VideoItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -51,9 +59,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteFolder,
   videoFolderMap,
   bookmarkedIds,
+  customTags,
+  videoCustomTagsMap,
+  selectedCustomTag,
+  onSelectCustomTag,
+  onAddCustomTag,
+  onRenameCustomTag,
+  onDeleteCustomTag,
+  videos,
 }) => {
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [editingTag, setEditingTag] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState("");
 
   const submitNewFolder = () => {
     if (newFolderName.trim()) {
@@ -61,6 +82,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setNewFolderName("");
       setIsAddingFolder(false);
     }
+  };
+
+  const submitNewTag = () => {
+    if (newTagName.trim()) {
+      onAddCustomTag(newTagName.trim());
+      setNewTagName("");
+      setIsAddingTag(false);
+    }
+  };
+
+  const submitRenameTag = (oldTag: string) => {
+    if (editingTagName.trim() && editingTagName.trim() !== oldTag) {
+      onRenameCustomTag(oldTag, editingTagName.trim());
+    }
+    setEditingTag(null);
+    setEditingTagName("");
   };
 
   return (
@@ -342,6 +379,158 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {option.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Section 3: My Tags Management (나의 태그 관리) */}
+          <div className="border-t border-slate-850 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="flex items-center gap-2 text-xs font-semibold tracking-wider text-slate-400 font-display">
+                <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                나의 태그 필터 & 관리
+              </span>
+              {selectedCustomTag && (
+                <button
+                  onClick={() => onSelectCustomTag(null)}
+                  className="text-[10px] font-medium text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
+                >
+                  필터 해제
+                </button>
+              )}
+            </div>
+
+            {/* Custom Tags List with filter toggle & CRUD inline buttons */}
+            <div className="flex flex-col gap-2">
+              {customTags.map((tag) => {
+                const tagCount = videos.filter((v) => (videoCustomTagsMap[v.id] || []).includes(tag)).length;
+                const isSelected = selectedCustomTag === tag;
+                const isEditing = editingTag === tag;
+
+                return (
+                  <div key={tag} className="group/tag flex items-center justify-between gap-1 w-full">
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 flex-1 p-1 bg-slate-900/50 border border-slate-800 rounded-xl">
+                        <input
+                          type="text"
+                          value={editingTagName}
+                          onChange={(e) => setEditingTagName(e.target.value)}
+                          maxLength={15}
+                          className="flex-1 px-2 py-1 text-[11px] bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-indigo-500/50"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              submitRenameTag(tag);
+                            } else if (e.key === "Escape") {
+                              setEditingTag(null);
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => submitRenameTag(tag)}
+                          className="p-1.5 text-emerald-400 hover:bg-slate-900 rounded-md cursor-pointer flex items-center justify-center"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setEditingTag(null)}
+                          className="p-1.5 text-slate-400 hover:bg-slate-900 rounded-md cursor-pointer flex items-center justify-center"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => onSelectCustomTag(isSelected ? null : tag)}
+                          className={`flex items-center justify-between flex-1 px-4 py-3 text-xs font-medium rounded-xl transition-all duration-300 text-left border cursor-pointer ${
+                            isSelected
+                              ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300 shadow-lg shadow-indigo-500/2 font-semibold"
+                              : "bg-slate-900/40 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80"
+                          }`}
+                        >
+                          <span className="truncate">#{tag}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                            isSelected
+                              ? "bg-indigo-500 text-slate-950"
+                              : "bg-slate-800 text-slate-400"
+                          }`}>
+                            {tagCount}
+                          </span>
+                        </button>
+                        
+                        {/* Edit and Delete Action Buttons (visible on hover) */}
+                        <div className="flex items-center opacity-0 group-hover/tag:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={() => {
+                              setEditingTag(tag);
+                              setEditingTagName(tag);
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-slate-900/50 rounded-md cursor-pointer"
+                            title="태그 수정"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteCustomTag(tag)}
+                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-900/50 rounded-md cursor-pointer"
+                            title="태그 삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add tag inline UI */}
+              {isAddingTag ? (
+                <div className="flex flex-col gap-1.5 mt-1 p-2 bg-slate-900/50 border border-slate-850 rounded-xl">
+                  <input
+                    type="text"
+                    placeholder="새 태그명..."
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    maxLength={15}
+                    className="w-full px-2 py-1 text-[11px] bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        submitNewTag();
+                      } else if (e.key === "Escape") {
+                        setIsAddingTag(false);
+                        setNewTagName("");
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => {
+                        setIsAddingTag(false);
+                        setNewTagName("");
+                      }}
+                      className="px-2 py-1 text-[9px] text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={submitNewTag}
+                      className="px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-300 text-[9px] font-semibold rounded-md transition-all"
+                    >
+                      추가
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAddingTag(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 mt-1 text-[10px] text-indigo-400/80 hover:text-indigo-300 transition-colors text-left cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>새 태그 추가</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

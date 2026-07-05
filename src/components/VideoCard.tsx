@@ -11,6 +11,9 @@ interface VideoCardProps {
   onToggleBookmark: (id: string) => void;
   onPlayClick?: (video: VideoItem) => void;
   hasNote?: boolean;
+  isFocused?: boolean;
+  isAnyVideoFocused?: boolean;
+  onToggleFocus?: (id: string) => void;
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({
@@ -21,6 +24,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onToggleBookmark,
   onPlayClick,
   hasNote,
+  isFocused = false,
+  isAnyVideoFocused = false,
+  onToggleFocus,
 }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -74,14 +80,34 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     return `${count.toLocaleString()}회`;
   };
 
+  const shouldBlur = isAnyVideoFocused && !isFocused;
+  const isSelfFocused = isAnyVideoFocused && isFocused;
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="group relative flex flex-col bg-[#1e293b]/70 backdrop-blur-md border border-slate-700/40 rounded-[28px] overflow-hidden hover:border-emerald-500/30 transition-all duration-300 shadow-lg hover:shadow-2xl hover:shadow-indigo-500/5 h-full"
+      whileHover={shouldBlur ? {} : { 
+        y: -6, 
+        scale: 1.025,
+        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+      }}
+      transition={{ 
+        type: "spring",
+        stiffness: 260,
+        damping: 26,
+        mass: 1,
+        layout: { type: "spring", stiffness: 220, damping: 28 }
+      }}
+      className={`group relative flex flex-col bg-[#1e293b]/70 backdrop-blur-md border rounded-[28px] overflow-hidden transition-all duration-500 shadow-lg h-full ${
+        isSelfFocused 
+          ? "border-indigo-500 ring-2 ring-indigo-500/40 shadow-[0_0_35px_rgba(99,102,241,0.25)] z-20 bg-[#1e293b]" 
+          : shouldBlur 
+            ? "border-slate-800/10 opacity-15 blur-[4px] scale-[0.96] pointer-events-none select-none" 
+            : "border-slate-700/40 hover:border-emerald-500/30"
+      }`}
     >
       {/* Thumbnail Area with dynamic play hover */}
       <div 
@@ -111,11 +137,30 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {/* Note indicator */}
         {hasNote && (
           <div
-            className="absolute top-3 right-[48px] p-2 rounded-xl border border-amber-500/30 bg-amber-500/15 backdrop-blur-md text-amber-400 shadow-sm z-10 cursor-help"
+            className="absolute top-3 right-[84px] p-2 rounded-xl border border-amber-500/30 bg-amber-500/15 backdrop-blur-md text-amber-400 shadow-sm z-10 cursor-help"
             title="작성된 메모가 있습니다"
           >
             <FileText className="w-3.5 h-3.5" />
           </div>
+        )}
+
+        {/* Focus Mode (집중 모드) Button */}
+        {onToggleFocus && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFocus(video.id);
+            }}
+            className={`absolute top-3 right-[48px] p-2 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-sm z-10 cursor-pointer ${
+              isFocused
+                ? "bg-indigo-500/20 hover:bg-indigo-500/30 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-500/10 animate-pulse"
+                : "bg-slate-950/80 hover:bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+            }`}
+            title={isFocused ? "집중 모드 해제" : "집중 모드"}
+          >
+            <Eye className={`w-3.5 h-3.5 transition-transform duration-300 active:scale-125 ${isFocused ? "text-indigo-300" : ""}`} />
+          </button>
         )}
 
         {/* Bookmark (찜하기) Button */}
