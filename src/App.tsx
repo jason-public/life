@@ -719,10 +719,10 @@ export default function App() {
           {/* Hero Welcome banner */}
           <div className="mb-8">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mb-2 font-display">
-              지혜의 집약체, 인생 조언 보드
+              제이슨의 인생 지혜 콜렉션
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-              Google DeepMind의 정교함을 담은 슬레이트 인디고 테마와 토스(Toss) 스타일의 미니멀 인터페이스로 구현한 유튜브 인생학 동영상 큐레이션입니다. 대화법, 인간관계, 성공을 향한 최고의 에센스를 경험해보세요.
+              제이슨이 그동안 관심있게 정리한 인생에 관한 조언들입니다. 인생 조언에 대한 영상들을 보며 잠시나마 쉬어가는 시간을 가지시길 바랍니다.
             </p>
           </div>
 
